@@ -1,4 +1,17 @@
-import type { Transaction } from '@tiptap/pm/state';
+import { closeHistory } from '@tiptap/pm/history';
+import { TextSelection } from '@tiptap/pm/state';
+import type { EditorState, Transaction } from '@tiptap/pm/state';
+
+export function replaceOneLine(state: EditorState, line: number, expectedText: string, replacement: string): Transaction | false {
+  if (!Number.isInteger(line) || line < 0 || line >= state.doc.childCount || /[\r\n]/.test(replacement) || replacement === expectedText) return false;
+  const paragraph = state.doc.child(line);
+  if (paragraph.type.name !== 'paragraph' || paragraph.textContent !== expectedText) return false;
+  let start = 1;
+  for (let index = 0; index < line; index++) start += state.doc.child(index).nodeSize;
+  // Replace only content: the paragraph's identity and a manual rhyme reference remain intact.
+  const transaction = closeHistory(state.tr).insertText(replacement, start, start + paragraph.content.size);
+  return transaction.setSelection(TextSelection.create(transaction.doc, start + replacement.length));
+}
 
 export function mapReferenceLine(transaction: Transaction, referenceLine: number | null): number | null {
   if (referenceLine === null || !transaction.docChanged) return referenceLine;

@@ -16,6 +16,13 @@ export interface SuggestionResponse {
   mode: 'demo' | 'ai';
   referenceLine: number | null;
 }
+export interface RepairSuggestion { id: string; text: string; accentedText: string; syllables: number }
+export interface RepairResponse {
+  source: string;
+  suggestions: RepairSuggestion[];
+  mode: 'ai';
+  model: string;
+}
 export interface Poem {
   id: string;
   title: string;

@@ -11,7 +11,7 @@ import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorSelection, PoetrySettings } from './types';
 import { getRhymeLabel } from './lib/poetry';
-import { mapReferenceLine } from './lib/editor-transactions';
+import { mapReferenceLine, replaceOneLine } from './lib/editor-transactions';
 import { analyzeLineProsody } from './lib/prosody';
 import type { ProsodyResponse } from './lib/prosody';
 import { createStressEdit } from './lib/stress';
@@ -19,6 +19,7 @@ import './editor.css';
 
 export interface PoemEditorHandle {
   acceptSuggestion(text: string): boolean;
+  replaceLine(line: number, expectedText: string, replacement: string): boolean;
   toggleStress(): boolean;
   focus(): void;
   insertStanza(): void;
@@ -38,6 +39,7 @@ export interface PoemEditorProps {
   onSuggestionNavigate(direction: 1 | -1): void;
   onAcceptSelectedSuggestion(): boolean;
   onStressResult?(success: boolean): void;
+  onIssueSelect?(line: number, issueIndex: number): void;
   popupOpen: boolean;
 }
 
@@ -160,9 +162,11 @@ export const PoemEditor = forwardRef<PoemEditorHandle, PoemEditorProps>(function
                     ...(stress.source === 'auto' ? { title: 'Автоматическое ударение; можно закрепить вручную' } : {}),
                   }));
                 }
-                for (const issue of analysis.issues) {
+                for (const [issueIndex, issue] of analysis.issues.entries()) {
                   if (issue.end > issue.start) decorations.push(Decoration.inline(contentStart + issue.start, contentStart + issue.end, {
                     class: `poem-meter-issue is-${issue.kind}`,
+                    'data-line-index': String(index),
+                    'data-issue-index': String(issueIndex),
                     title: issue.message,
                   }));
                 }
@@ -234,6 +238,17 @@ export const PoemEditor = forwardRef<PoemEditorHandle, PoemEditorProps>(function
         return true;
       },
       handleDOMEvents: {
+        click(_view, event) {
+          const issue = event.target instanceof Element ? event.target.closest<HTMLElement>('.poem-meter-issue') : null;
+          if (issue) {
+            const line = Number(issue.dataset.lineIndex);
+            const issueIndex = Number(issue.dataset.issueIndex);
+            if (Number.isInteger(line) && line >= 0 && Number.isInteger(issueIndex) && issueIndex >= 0) {
+              latest.current.onIssueSelect?.(line, issueIndex);
+            }
+          }
+          return false;
+        },
         compositionstart() {
           composing.current = true;
           latest.current.onDismissSuggestions();
@@ -306,6 +321,18 @@ export const PoemEditor = forwardRef<PoemEditorHandle, PoemEditorProps>(function
 
   useImperativeHandle(ref, () => ({
     toggleStress,
+    replaceLine(line, expectedText, replacement) {
+      const current = editorRef.current;
+      if (!current || current.isDestroyed || composing.current || current.view.composing) return false;
+      const transaction = replaceOneLine(current.state, line, expectedText, replacement);
+      if (!transaction) return false;
+      current.view.dispatch(transaction.scrollIntoView());
+      current.view.dispatch(closeHistory(current.state.tr).setMeta('addToHistory', false));
+      // Dispatch publishes onUpdate synchronously; dismiss afterwards so its debounce stays closed.
+      latest.current.onDismissSuggestions();
+      current.view.focus();
+      return true;
+    },
     acceptSuggestion(text) {
       const current = editorRef.current;
       if (!current || current.isDestroyed || composing.current || !current.state.selection.empty) return false;
