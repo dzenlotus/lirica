@@ -17,7 +17,7 @@ test('malformed storage is not overwritten by autosave', () => {
   const storage = { getItem: () => '{broken', setItem: () => { written = true; } };
   assert.throws(() => persistPoems(storage, [poem]));
   assert.equal(written, false);
-  for (const change of [{ updatedAt: 'bad-date' }, { lines: [] }, { settings: { ...poem.settings, feet: 0 } }, { favorite: 'yes' }]) assert.throws(() => decodePoems(JSON.stringify([{ ...poem, ...change }])));
+  for (const change of [{ updatedAt: 'bad-date' }, { lines: [] }, { settings: { ...poem.settings, feet: 0 } }, { settings: { ...poem.settings, autoMeter: 'yes' } }, { favorite: 'yes' }]) assert.throws(() => decodePoems(JSON.stringify([{ ...poem, ...change }])));
   assert.throws(() => decodePoems(JSON.stringify([poem, poem])));
   assert.deepEqual(decodePoems(JSON.stringify([poem])), [poem]);
 });

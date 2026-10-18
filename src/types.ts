@@ -9,6 +9,7 @@ export interface PoetrySettings {
   referenceLine: number | null;
   autoSuggest: boolean;
   autoStress?: boolean;
+  autoMeter?: boolean;
 }
 export interface Suggestion { id: string; text: string; rhymeWord: string }
 export interface SuggestionResponse {

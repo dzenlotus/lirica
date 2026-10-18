@@ -32,6 +32,8 @@ export interface PoemEditorProps {
   lines: string[];
   settings: PoetrySettings;
   prosody?: ProsodyResponse;
+  lineFeet?: ReadonlyArray<number | null>;
+  rhymeLabels?: ReadonlyArray<string | null>;
   onChange(lines: string[], referenceLine?: number | null): void;
   onSelectionChange(selection: EditorSelection): void;
   onRequestSuggestions(): void;
@@ -146,9 +148,10 @@ export const PoemEditor = forwardRef<PoemEditorHandle, PoemEditorProps>(function
               const referenceLine = reference.current.current;
               state.doc.forEach((node, position, index) => {
                 const isBlank = !node.textContent.trim();
-                const rhyme = isBlank ? '' : getRhymeLabel(index, scheme, lines) ?? '';
+                const rhyme = isBlank ? '' : (latest.current.rhymeLabels ? latest.current.rhymeLabels[index] : getRhymeLabel(index, scheme, lines)) ?? '';
                 const active = state.selection.$from.index(0) === index;
-                const analysis = analyzeLineProsody(node.textContent, autoStress ? latest.current.prosody?.lines[index] : undefined, meter, feet);
+                const lineFeet = latest.current.lineFeet?.[index];
+                const analysis = analyzeLineProsody(node.textContent, autoStress ? latest.current.prosody?.lines[index] : undefined, latest.current.lineFeet && lineFeet == null ? 'free' : meter, lineFeet ?? feet);
                 decorations.push(Decoration.node(position, position + node.nodeSize, {
                   class: `poem-line${active ? ' is-active' : ''}${referenceLine === index ? ' is-reference' : ''}`,
                   'data-line-number': String(index + 1),
@@ -313,7 +316,7 @@ export const PoemEditor = forwardRef<PoemEditorHandle, PoemEditorProps>(function
     if (editor && !editor.isDestroyed && !composing.current && !editor.view.composing) {
       editor.view.dispatch(editor.state.tr.setMeta(lineDecorationKey, true));
     }
-  }, [editor, props.settings.scheme, props.settings.referenceLine, props.settings.meter, props.settings.feet, props.settings.autoStress, props.prosody]);
+  }, [editor, props.settings.scheme, props.settings.referenceLine, props.settings.meter, props.settings.feet, props.settings.autoStress, props.prosody, props.lineFeet, props.rhymeLabels]);
 
   useEffect(() => () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
